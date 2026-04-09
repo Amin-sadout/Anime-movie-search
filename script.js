@@ -1,70 +1,156 @@
-const searchInput = document.getElementById('searchInput')
-const searchBtn = document.getElementById('searchBtn')
-const resultList = document.getElementById('resultList')
-const message = document.getElementById('message')
+const searchInput = document.getElementById('searchInput');
+const searchBtn = document.getElementById('searchBtn');
+const resultList = document.getElementById('resultList');
+const message = document.getElementById('message');
+const sortBtn = document.getElementById('sortBtn');
+const clearBtn = document.getElementById('clearBtn');
 
-const movies = [ 
-    {
-    title: 'Demon slayer: Infinity Castle',
-    movieLength: '1 hours',
-    poster: "https://img.youtube.com/vi/x7uLutVRBfI/maxresdefault.jpg"
-},
-   {
-    title: 'One piece random movie',
-    movieLength: '3 hours',
-    poster: "https://static.beebom.com/wp-content/uploads/2023/02/chopper-kingdom.jpg?quality=75&strip=all"
-},
-   {
-    title: 'Naruto The Last',
-    movieLength: '2 hours',
-    poster: "https://wallpapercave.com/wp/wp3632477.jpg"
-},
-];
+let moviesToRender = [];
+let isDescending = true;
 
-const renderMovies = (moviesToRender) => {
-     resultList.innerHTML = '';
+const renderMovies = (searchedMovies) => {
+  resultList.innerHTML = ``;
 
-     for (let i = 0; i < moviesToRender.length; i++) {
-        const li = document.createElement('li')
-        const title = document.createElement('p')
-        const length = document.createElement('p')
-        const posterImg = document.createElement('img')
-        length.textContent = moviesToRender[i].movieLength;
-        title.textContent = moviesToRender[i].title;
-        posterImg.src = moviesToRender[i].poster
-        posterImg.alt = moviesToRender[i].title
-        li.appendChild(posterImg)
-        li.appendChild(title);
-        li.appendChild(length)
-        resultList.appendChild(li);
-    }
-     
+  for (let i = 0; i <searchedMovies.length; i++) {
+    const li = document.createElement(`li`);
+    const title = document.createElement(`p`);
+    const length = document.createElement(`p`);
+    const posterImg = document.createElement(`img`);
+    const score = document.createElement(`p`);
+    const link = document.createElement('a');
+    link.classList.add('link')
+    link.href = searchedMovies[i].url;
+    link.textContent = 'View details';
+    link.target = '_blank'; // to open our link into a new page instead of the main one we're in
+    posterImg.src = searchedMovies[i].poster
+    length.textContent = searchedMovies[i].movieLength;
+    title.textContent = searchedMovies[i].title;
+    posterImg.alt = searchedMovies[i].title;
+    score.textContent = `Score: ${searchedMovies[i].score}`;
+
+    li.appendChild(posterImg);
+    li.appendChild(link);
+    li.appendChild(score);
+    li.appendChild(title);
+    li.appendChild(length);
+    resultList.appendChild(li);
+  }
+};
+
+clearBtn.addEventListener('click', () => {
+searchInput.value = ''
+message.textContent = ''
+moviesToRender = []
+renderMovies(moviesToRender)
+sortBtn.textContent = 'Sort By Score'
+isDescending = true;
+})
+
+const resetSearchButton = () => {
+  searchBtn.disabled = false;
+  searchBtn.textContent = 'Search';
+};
+
+const stateRest = () => {
+sortBtn.textContent = 'Sort By Score';
+  isDescending = true;
+}
+
+const searchMovies = async () => {
+  const searchText = searchInput.value.toLowerCase().trim();
+  const url = `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(searchText)}&type=movie&limit=25`
+
+  if (searchText === ``) {
+    message.textContent = ``;
+    moviesToRender = [];
+  renderMovies(moviesToRender);
+    return;
+  }
+
+ searchBtn.disabled = true;
+searchBtn.textContent = 'Searching...';
+stateRest();
+try {
+  const response = await fetch(url);
+if (!response.ok) {
+   throw new Error(`Request failed: ${response.status}`) }
+
+  const data = await response.json(); 
+  console.log(response)
+  console.log(data) 
+
+ const searchedMovies = data.data.map((anime) => {
+  return {
+    title: anime.title || `Unknown title` ,
+    movieLength: anime.duration || `Unknown length`,
+    poster: anime.images.jpg.image_url,
+    score: anime.score || 0,
+    url: anime.url
+  };
+});
+
+if (searchedMovies.length === 0) {
+  message.textContent = `No movies found`;
+  moviesToRender = [];
+  renderMovies(moviesToRender);
+  return;
+}
+
+   moviesToRender = searchedMovies;
+  renderMovies(moviesToRender);
+  if (moviesToRender.length === 1) {
+    message.textContent = `1 Movie found`
+  }
+  else {
+    message.textContent = `${searchedMovies.length} movies found`
+    message.style.color = 'black'
+  }
+  return;
 
 }
 
-searchBtn.addEventListener('click', () => { // useless for now but i'll keep it in case i'll need to use it somehow
-   handleSearch();
-});
+  catch (error) {
+    console.log(error);
+    message.style.color = 'red'
+  message.textContent = `Error: ${error.message}`;
+  moviesToRender = [];
+  renderMovies(moviesToRender);
+  return;
+  } finally {
+  resetSearchButton();
+}
 
-searchInput.addEventListener('input', () => {
-    handleSearch();
-});
 
-const handleSearch = () => {
- const searchText = searchInput.value.toLowerCase().trim();
-
- const filteredMovies = movies.filter((movie) => {
-        return movie.title.toLowerCase().startsWith(searchText);
-    });
-
-    if (filteredMovies.length === 0) {
-        message.textContent = 'no movies found'
-       renderMovies([]); // this will render an empty array therefor if there is nothing, we show nothing instead of the last shown movie/movies
-        return;
-    }
-
-    message.textContent = '';
-    renderMovies(filteredMovies);
 };
 
-renderMovies(movies);
+
+searchBtn.addEventListener('click', () => {
+  searchMovies();
+});
+
+searchInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    searchMovies();
+  }
+});
+
+sortBtn.addEventListener('click', () => {
+  if (moviesToRender.length === 0) {
+  message.textContent = 'Search for movies first';
+  return;
+}
+  moviesToRender.sort((a, b) => {
+    if (isDescending === true) {
+      sortBtn.textContent = 'Sort by lowest score';
+      return b.score - a.score;
+    } else {
+      sortBtn.textContent = 'Sort by highest score';
+      return a.score - b.score;
+    }
+  });
+
+  isDescending = !isDescending;
+  renderMovies(moviesToRender);
+});
+
+
